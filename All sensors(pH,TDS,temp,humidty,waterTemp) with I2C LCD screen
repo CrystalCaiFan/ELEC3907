@@ -1,0 +1,118 @@
+/*
+ * Created by Secil Sel
+ * 28 March 2022 
+ * ELEC3907 Group2C
+ * Smart Hydroponics Project
+ * 
+ */
+#include <EEPROM.h>
+#include "GravityTDS.h"
+#include<Wire.h>
+#include<OneWire.h>
+#include <LiquidCrystal_I2C.h>
+#include "DHT.h"
+#include <DallasTemperature.h>
+
+#define DHTPIN 2
+#define DHTTYPE DHT11
+#define TdsSensorPin A1
+
+const int SENSOR_PIN = 4;
+
+GravityTDS gravityTds;
+OneWire oneWire (SENSOR_PIN);
+DallasTemperature sensors(&oneWire); //pass oneWire to DallasTemperature
+
+float tempCelsius;
+float temperature = 25,tdsValue = 0;
+float calibration_value = 21.34;
+int phval = 0; 
+unsigned long int avgval; 
+int buffer_arr[10],temp;
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // I2C address 0x3F, 16 column and 2 rows
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup()
+{
+  sensors.begin(); //initialize watertemp sensor
+  
+  dht.begin();     // initialize the sensor
+  lcd.init();      // initialize the lcd
+  lcd.begin(16,2);
+  lcd.backlight(); // open the backlight 
+  lcd.setCursor(0,0);
+
+    gravityTds.setPin(TdsSensorPin);
+    gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
+    gravityTds.setAdcRange(1024);  //1024 for 10bit ADC;4096 for 12bit ADC
+    gravityTds.begin();  //initialization
+}
+
+void loop()
+{
+  for(int i=0;i<10;i++) 
+ { 
+ buffer_arr[i]=analogRead(A0);
+ delay(30);
+ }
+ for(int i=0;i<9;i++)
+ {
+  for(int j=i+1;j<10;j++)
+  {
+    if(buffer_arr[i]>buffer_arr[j])
+      {
+       temp=buffer_arr[i];
+       buffer_arr[i]=buffer_arr[j];
+       buffer_arr[j]=temp;
+ }
+  }
+    }
+ avgval=0;
+ for(int i=2;i<8;i++)
+ avgval+=buffer_arr[i];
+ float volt=(float)avgval*5.0/1024/6;
+ float ph_act = -5.60 * volt + calibration_value;
+ 
+    gravityTds.setTemperature(temperature);  // set the temperature and execute temperature compensation
+    gravityTds.update();                     //sample and calculate
+    tdsValue = gravityTds.getTdsValue();     // then get the value
+    
+ lcd.setCursor(0, 0);
+ lcd.print("pH Val:");
+ lcd.setCursor(8, 0);
+ lcd.print(ph_act);
+ lcd.setCursor(0, 1);        // start to print at the second row
+ lcd.print("TDS: ");
+ lcd.print(tdsValue);       // print the TDS value
+ lcd.print("ppm");
+ delay(5000);             // wait a five seconds between measurements
+
+    float humi  = dht.readHumidity();    // read humidity
+    float tempC = dht.readTemperature(); // read temperature
+
+ lcd.clear();              //clear the screen for temperature&humidity reading
+ 
+ lcd.setCursor(0, 0);  // start to print at the first row
+ lcd.print("Temp: ");
+ lcd.print(tempC);     // print the temperature
+ lcd.print((char)223); // print ° character
+ lcd.print("C");
+ lcd.setCursor(0, 1);  // start to print at the second row
+ lcd.print("Humi: ");
+ lcd.print(humi);      // print the humidity
+ lcd.print("%");
+ delay(5000);
+ lcd.clear();            //clear the screen for waterTemp reading
+
+   sensors.requestTemperatures(); //send the command to get temperatures
+   tempCelsius = sensors.getTempCByIndex(0);  //read temperature in Celsius
+  
+ lcd.setCursor(0,0); //start to print at the first row
+ lcd.print("WaterTemp: ");
+ lcd.setCursor(0,1);
+ lcd.print(tempCelsius);  //print the temperature in Celsius
+ lcd.print((char)223);
+ lcd.print("C");
+ delay(5000);
+ lcd.clear();
+}
