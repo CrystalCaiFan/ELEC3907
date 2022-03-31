@@ -5,6 +5,8 @@
  * Smart Hydroponics Project
  * 
  */
+ 
+ //add libraries for sensors
 #include <EEPROM.h>
 #include "GravityTDS.h"
 #include<Wire.h>
